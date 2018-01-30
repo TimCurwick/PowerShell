@@ -2164,6 +2164,8 @@ namespace System.Management.Automation.Language
                     return BinaryDivide(target, arg, errorSuggestion).WriteToDebugLog(this);
                 case ExpressionType.Modulo:
                     return BinaryRemainder(target, arg, errorSuggestion).WriteToDebugLog(this);
+                case ExpressionType.AddAssign:
+                    return BinaryAddAssign(target, arg, errorSuggestion).WriteToDebugLog(this);
                 case ExpressionType.And:
                     return BinaryBitwiseAnd(target, arg, errorSuggestion).WriteToDebugLog(this);
                 case ExpressionType.Or:
@@ -2222,6 +2224,7 @@ namespace System.Management.Automation.Language
                 case ExpressionType.Multiply: return TokenKind.Multiply.Text();
                 case ExpressionType.Divide: return TokenKind.Divide.Text();
                 case ExpressionType.Modulo: return TokenKind.Rem.Text();
+                case ExpressionType.AddAssign: return TokenKind.PlusEquals.Text();
                 case ExpressionType.And: return TokenKind.Band.Text();
                 case ExpressionType.Or: return TokenKind.Bor.Text();
                 case ExpressionType.ExclusiveOr: return TokenKind.Bxor.Text();
@@ -2767,6 +2770,108 @@ namespace System.Management.Automation.Language
         private DynamicMetaObject BinaryRemainder(DynamicMetaObject target, DynamicMetaObject arg, DynamicMetaObject errorSuggestion)
         {
             return BinarySubDivOrRem(target, arg, errorSuggestion, "Remainder", "op_Modulus", "%");
+        }
+
+        private DynamicMetaObject BinaryAddAssign(DynamicMetaObject target, DynamicMetaObject arg, DynamicMetaObject errorSuggestion)
+        {
+            if ( target.Value is Array)
+            {
+                var lhsEnumerator = PSEnumerableBinder.IsEnumerable(target);
+                Type targetElementType = target.Value.GetType().GetElementType();
+
+                if (arg.Value is Array)
+                {
+                    if (arg.Value.GetType().GetElementType().IsAssignableFrom(targetElementType))
+                    {
+                        //  TargetArray += LikeArray > TargetArrayType
+                        return new DynamicMetaObject(Expression.Call(
+                            CachedReflectionInfo.ArrayOps_AddAssignArray,
+                            target.Expression.Cast(typeof(Array)),
+                            arg.Expression.Cast(typeof(Array)),
+                            Expression.Constant(targetElementType)),
+                                target.CombineRestrictions(arg)); 
+                    }
+                    else
+                    {
+                        var e = (IEnumerator)arg.Expression;
+                        while (e.MoveNext())
+                        {
+                            if ( ! ( e.Current.GetType().GetElementType().IsAssignableFrom(targetElementType) ) )
+                            {
+                                //  TargetArray += UnlikeArrayUnlikeElements > Object[]
+                                return new DynamicMetaObject(Expression.Call(
+                                    CachedReflectionInfo.ArrayOps_AddAssignArray,
+                                    target.Expression.Cast(typeof(Array)),
+                                    arg.Expression.Cast(typeof(Array)),
+                                    Expression.Constant(typeof(Object))),
+                                        target.CombineRestrictions(arg)); 
+                            }
+                        }
+                        //  TargetArray += UnlikeArraylikeElements > TargetArrayType
+                        return new DynamicMetaObject(Expression.Call(
+                            CachedReflectionInfo.ArrayOps_AddAssignArray,
+                            target.Expression.Cast(typeof(Array)),
+                            arg.Expression.Cast(typeof(Array)),
+                            Expression.Constant(targetElementType)),
+                                target.CombineRestrictions(arg)); 
+                    }
+                }
+
+                var rhsEnumerator = PSEnumerableBinder.IsEnumerable(arg);
+                if (rhsEnumerator != null)
+                {
+                    var e = (IEnumerator)arg.Expression;
+                    while (e.MoveNext())
+                    {
+                        if ( ! ( e.Current.GetType().GetElementType().IsAssignableFrom(targetElementType) ) )
+                        {
+                            //  TargetArray += EnumerableUnlikeElements > Object[]
+                            return new DynamicMetaObject(Expression.Call(
+                                CachedReflectionInfo.ArrayOps_AddAssignEnumerable,
+                                ExpressionCache.GetExecutionContextFromTLS,
+                                target.Expression.Cast(typeof(Array)),
+                                arg.Expression.Cast(typeof(IEnumerator)),
+                                Expression.Constant(typeof(Object))),
+                                    target.CombineRestrictions(arg));
+                        }
+                    }
+                    //  TargetArray += EnumerableLikeElements > TargetArrayType
+                    return new DynamicMetaObject(Expression.Call(
+                        CachedReflectionInfo.ArrayOps_AddAssignEnumerable,
+                        ExpressionCache.GetExecutionContextFromTLS,
+                        target.Expression.Cast(typeof(Array)),
+                        arg.Expression.Cast(typeof(IEnumerator)),
+                        Expression.Constant(targetElementType)),
+                            target.CombineRestrictions(arg));
+                }
+
+                if (arg.Value.GetType().GetElementType().IsAssignableFrom(targetElementType) )
+                {
+                    //  TargetArray += LikeObject > TargetArrayType
+                    return new DynamicMetaObject(Expression.Call(
+                        CachedReflectionInfo.ArrayOps_AddAssignObject,
+                        target.Expression.Cast(typeof(Array)),
+                        arg.Expression.Cast(typeof(object)),
+                        Expression.Constant(targetElementType)),
+                            target.CombineRestrictions(arg));
+                }
+                
+                //  TargetArray += UnlikeObject > Object[]
+                return new DynamicMetaObject(Expression.Call(
+                    CachedReflectionInfo.ArrayOps_AddAssignObject,
+                    // ExpressionCache.GetExecutionContextFromTLS,
+                    target.Expression.Cast(typeof(Array)),
+                    arg.Expression.Cast(typeof(object)),
+                    Expression.Constant(typeof(Object))),
+                        target.CombineRestrictions(arg));
+            }
+            else
+            {
+                return (errorSuggestion ??
+                        new DynamicMetaObject(
+                            Compiler.CreateThrow(typeof(object), typeof(PSNotImplementedException), "Unimplemented operation"),
+                            target.CombineRestrictions(arg))).WriteToDebugLog(this);
+            }
         }
 
         private DynamicMetaObject BinarySubDivOrRem(DynamicMetaObject target,

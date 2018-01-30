@@ -4,6 +4,7 @@ Copyright (c) Microsoft Corporation. All rights reserved.
 
 // ReSharper disable UnusedMember.Global
 
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Management.Automation.Internal;
@@ -96,6 +97,83 @@ namespace System.Management.Automation
 
             return result;
         }
+
+        internal static object AddAssignArray(Array target, Array arg, Type elementType)
+        {
+            Array result = Array.CreateInstance(elementType, target.Length + arg.Length);
+            target.CopyTo(result, 0);
+            arg.CopyTo(result, target.Length);
+
+            return result;
+        }
+
+        // internal static object AddAssignArrayDefault(Array target, Array arg)
+        // {
+        //     int newSize = target.Length + arg.Length;
+        //     object[] result  = new object[newSize];
+
+        //     target.CopyTo(result, 0);
+        //     arg.CopyTo(result, target.Length);
+
+        //     return result;
+        // }
+
+        internal static object AddAssignEnumerable(ExecutionContext context, Array target, IEnumerator arg, Type elementType)
+        {
+//            var fakeEnumerator = arg as NonEnumerableObjectEnumerator;
+
+            var argAsList = new List<object>();
+
+            while (EnumerableOps.MoveNext(context, arg))
+            {
+                argAsList.Add(EnumerableOps.Current(arg));
+            }
+
+            Array result = Array.CreateInstance(elementType, target.Length + argAsList.Count);
+            target.CopyTo(result, 0);
+            argAsList.ToArray().CopyTo(result, target.Length);
+
+            return result;
+        }
+
+//         internal static object AddAssignEnumerableDefault(ExecutionContext context, Array target, IEnumerator arg)
+//         {
+// //            var fakeEnumerator = arg as NonEnumerableObjectEnumerator;
+//             var argAsList = new List<object>();
+
+//             while (EnumerableOps.MoveNext(context, arg))
+//             {
+//                 argAsList.Add(EnumerableOps.Current(arg));
+//             }
+
+//             int newSize = target.Length + argAsList.Count;
+//             object[] result  = new object[newSize];
+
+//             target.CopyTo(result, 0);
+//             argAsList.ToArray().CopyTo(result, target.Length);
+
+//             return result;
+//         }
+
+        internal static object AddAssignObject(Array target, object arg, Type elementType)
+        {
+            Array result = Array.CreateInstance(elementType, target.Length + 1);
+            target.CopyTo(result, 0);
+            target.SetValue(arg, target.Length);
+
+            return target;
+        }
+
+        // internal static object AddAssignObjectDefault(Array target, object arg)
+        // {
+        //     int newSize = target.Length + 1;
+        //     object[] result  = new object[newSize];
+
+        //     target.CopyTo(result, 0);
+        //     result.SetValue(arg, target.Length);
+
+        //     return result;
+        // }
 
         internal static object GetMDArrayValue(Array array, int[] indexes, bool slicing)
         {

@@ -38,6 +38,18 @@ namespace System.Management.Automation.Language
         internal static readonly MethodInfo ObjectList_ToArray =
             typeof(List<object>).GetMethod(nameof(List<object>.ToArray), PSTypeExtensions.EmptyTypes);
 
+        internal static readonly MethodInfo ArrayOps_AddAssignArray =
+            typeof(ArrayOps).GetMethod(nameof(ArrayOps.AddAssignArray), staticFlags);
+        // internal static readonly MethodInfo ArrayOps_AddAssignArrayDefault =
+        //     typeof(ArrayOps).GetMethod(nameof(ArrayOps.AddAssignArrayDefault), staticFlags);
+        internal static readonly MethodInfo ArrayOps_AddAssignEnumerable =
+            typeof(ArrayOps).GetMethod(nameof(ArrayOps.AddAssignEnumerable), staticFlags);
+        // internal static readonly MethodInfo ArrayOps_AddAssignEnumerableDefault =
+        //     typeof(ArrayOps).GetMethod(nameof(ArrayOps.AddAssignEnumerableDefault), staticFlags);
+        internal static readonly MethodInfo ArrayOps_AddAssignObject =
+            typeof(ArrayOps).GetMethod(nameof(ArrayOps.AddAssignObject), staticFlags);
+        // internal static readonly MethodInfo ArrayOps_AddAssignObjectDefault =
+        //     typeof(ArrayOps).GetMethod(nameof(ArrayOps.AddAssignObjectDefault), staticFlags);
         internal static readonly MethodInfo ArrayOps_GetMDArrayValue =
             typeof(ArrayOps).GetMethod(nameof(ArrayOps.GetMDArrayValue), staticFlags);
         internal static readonly MethodInfo ArrayOps_GetMDArrayValueOrSlice =
@@ -818,7 +830,7 @@ namespace System.Management.Automation.Language
             switch (tokenKind)
             {
                 case TokenKind.Equals: return av.SetValue(this, right);
-                case TokenKind.PlusEquals: et = ExpressionType.Add; break;
+                case TokenKind.PlusEquals: et = (left is Array) ? ExpressionType.AddAssign : ExpressionType.Add; break;
                 case TokenKind.MinusEquals: et = ExpressionType.Subtract; break;
                 case TokenKind.MultiplyEquals: et = ExpressionType.Multiply; break;
                 case TokenKind.DivideEquals: et = ExpressionType.Divide; break;
